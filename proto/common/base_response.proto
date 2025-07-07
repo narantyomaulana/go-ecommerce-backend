@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "github.com/narantyomaulana/go-grpc-ercommerce-be/pb/common";
+
+package common;
+
+
+message BaseResponse {
+  int64 status_code = 1;
+  string message = 2;
+  bool is_error = 3;
+}
