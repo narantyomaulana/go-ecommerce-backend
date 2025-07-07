@@ -8,3 +8,12 @@ func SuccessResponse(message string) *common.BaseResponse {
 		Message:    message,
 	}
 }
+
+func ValidationErrorResponse(validationErrors []*common.ValidationError) *common.BaseResponse {
+	return &common.BaseResponse{
+		StatusCode:       400,
+		Message:          "Validation error",
+		IsError:          true,
+		ValidationErrors: validationErrors,
+	}
+}
