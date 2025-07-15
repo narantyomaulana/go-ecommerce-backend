@@ -8,7 +8,9 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/handler"
-	"github.com/narantyomaulana/go-grpc-ercommerce-be/pb/service"
+	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/repository"
+	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/service"
+	"github.com/narantyomaulana/go-grpc-ercommerce-be/pb/auth"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/pkg/database"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/pkg/grpcmiddleware"
 	"google.golang.org/grpc"
@@ -24,10 +26,12 @@ func main() {
 		log.Panicf("Error when listening: %v", err)
 	}
 
-	database.ConnectDB(ctx, os.Getenv("DB_URI"))
+	db := database.ConnectDB(ctx, os.Getenv("DB_URI"))
 	log.Println("Database connection established")
 
-	serviceHandler := handler.NewServiceHandler()
+	authRepository := repository.NewAuthRepository(db)
+	authService := service.NewAuthService(authRepository)
+	authHandler := handler.NewAuthHandler(authService)
 
 	serv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -35,7 +39,7 @@ func main() {
 		),
 	)
 
-	service.RegisterHelloWorldServiceServer(serv, serviceHandler)
+	auth.RegisterAuthServiceServer(serv, authHandler)
 
 	if os.Getenv("ENVIRONMENT") == "dev" {
 		reflection.Register(serv)

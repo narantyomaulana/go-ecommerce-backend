@@ -1,11 +1,21 @@
 package utils
 
-import "github.com/narantyomaulana/go-grpc-ercommerce-be/pb/common"
+import (
+	"github.com/narantyomaulana/go-grpc-ercommerce-be/pb/common"
+)
 
 func SuccessResponse(message string) *common.BaseResponse {
 	return &common.BaseResponse{
 		StatusCode: 200,
 		Message:    message,
+	}
+}
+
+func BadRequestResponse(message string) *common.BaseResponse {
+	return &common.BaseResponse{
+		StatusCode: 400,
+		Message:    message,
+		IsError:    true,
 	}
 }
 
