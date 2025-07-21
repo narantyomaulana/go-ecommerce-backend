@@ -10,6 +10,7 @@ option go_package = "github.com/narantyomaulana/go-grpc-ercommerce-be/pb/auth";
 service AuthService{
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
 }
 
 message RegisterRequest {
@@ -32,16 +33,25 @@ message RegisterRequest {
   }];
 }
 
+message RegisterResponse{
+  common.BaseResponse base = 1;
+}
+
+
 message LoginRequest {
   string email = 1 [(buf.validate.field). string = {min_len: 1,max_len: 255}];
   string password = 2 [(buf.validate.field). string = {min_len: 8,max_len: 255}];
-}
-
-message RegisterResponse{
-  common.BaseResponse base = 1;
 }
 
 message LoginResponse{
   common.BaseResponse base = 1;
   string access_token = 2;
 }
+
+message LogoutRequest {}
+
+message LogoutResponse{
+  common.BaseResponse base = 1;
+}
+
+
