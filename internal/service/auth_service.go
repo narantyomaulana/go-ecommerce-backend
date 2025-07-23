@@ -3,21 +3,19 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/entity"
+	jwtentity "github.com/narantyomaulana/go-grpc-ercommerce-be/internal/entity/jwt"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/repository"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/internal/utils"
 	"github.com/narantyomaulana/go-grpc-ercommerce-be/pb/auth"
 	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -77,7 +75,6 @@ func (as *authService) Register(ctx context.Context, request *auth.RegisterReque
 
 // Login implements IAuthService.
 func (as *authService) Login(ctx context.Context, request *auth.LoginRequest) (*auth.LoginResponse, error) {
-	// check apakah email ada
 	user, err := as.authRepository.GetUserByEmail(ctx, request.Email)
 	if err != nil {
 		return nil, err
@@ -88,7 +85,6 @@ func (as *authService) Login(ctx context.Context, request *auth.LoginRequest) (*
 		}, nil
 	}
 
-	// check apakah password sama
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(request.Password))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
@@ -97,9 +93,8 @@ func (as *authService) Login(ctx context.Context, request *auth.LoginRequest) (*
 		return nil, err
 	}
 
-	// generate jwt
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, entity.JwtClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtentity.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.Id,
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour * 24)),
@@ -116,7 +111,6 @@ func (as *authService) Login(ctx context.Context, request *auth.LoginRequest) (*
 		return nil, err
 	}
 
-	// send response
 	return &auth.LoginResponse{
 		Base:        utils.SuccessResponse("Login Successfull"),
 		AccessToken: accessToken,
@@ -125,62 +119,18 @@ func (as *authService) Login(ctx context.Context, request *auth.LoginRequest) (*
 
 // Logout implements IAuthService.
 func (as *authService) Logout(ctx context.Context, request *auth.LogoutRequest) (*auth.LogoutResponse, error) {
-	// Dapatkan token dari metadata
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-	}
-
-	bearerToken, ok := md["authorization"]
-	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-	}
-
-	if len(bearerToken) == 0 {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-
-	}
-
-	tokenSplit := strings.Split(bearerToken[0], " ")
-
-	if len(tokenSplit) != 2 {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-	}
-
-	if tokenSplit[0] != "Bearer" {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-	}
-
-	jwtToken := tokenSplit[1]
-
-	// Kembalikan token tadi hingga menjadi entity jwt
-
-	tokenClaims, err := jwt.ParseWithClaims(jwtToken, &entity.JwtClaims{}, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", t.Header["alg"])
-		}
-
-		return []byte(os.Getenv("JWT_SECRET")), nil
-
-	})
+	jwtToken, err := jwtentity.ParseTokenFromContext(ctx)
 
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
+		return nil, err
 	}
 
-	if !tokenClaims.Valid {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
+	tokenClaims, err := jwtentity.GetClaimsFromToken(jwtToken)
+	if err != nil {
+		return nil, err
 	}
 
-	var claims *entity.JwtClaims
-	if claims, ok = tokenClaims.Claims.(*entity.JwtClaims); !ok {
-		return nil, status.Error(codes.Unauthenticated, "Unauthenticated")
-	}
-
-	// kita masukan token ke dalam memory db / cache
-	as.cacheService.Set(jwtToken, "", time.Duration(claims.ExpiresAt.Time.Unix()-time.Now().Unix())*time.Second)
-
-	// kirim response
+	as.cacheService.Set(jwtToken, "", time.Duration(tokenClaims.ExpiresAt.Time.Unix()-time.Now().Unix())*time.Second)
 
 	return &auth.LogoutResponse{
 		Base: utils.SuccessResponse("Logout Successfull"),
